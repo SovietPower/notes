@@ -18,6 +18,16 @@
 
 
 
+---
+
+## ProtoBuf
+
+
+
+编译 .proto：`protoc --cpp_out=. a.proto`。会生成 a.pb.h 和 a.pb.cc 两个文件。
+
+
+
 
 
 

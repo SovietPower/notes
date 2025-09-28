@@ -26,6 +26,69 @@ template <typename T, std::size_t N>
 constexpr size_t arraySize(const T (&)[N]) noexcept { return N; }
 ```
 
+**简易线程池**
+
+```cpp
+class ThreadPool {
+ public:
+    ThreadPool(size_t numThreads);
+    ~ThreadPool();
+
+    void enqueueTask(std::function<void()> task);
+
+ private:
+    std::vector<std::thread> workers;
+    std::queue<std::function<void()>> tasks;
+
+    std::mutex queueMutex;
+    std::condition_variable condition;
+    bool stop;
+
+    void workerThread(int thread_id);
+};
+
+ThreadPool::ThreadPool(size_t numThreads) : stop(false) {
+  for (size_t i = 0; i < numThreads; ++i) {
+    workers.emplace_back(&ThreadPool::workerThread, this, i);
+  }
+}
+
+ThreadPool::~ThreadPool() {
+  {
+    std::unique_lock<std::mutex> lock(queueMutex);
+    stop = true;
+  }
+  condition.notify_all();
+  for (std::thread &worker : workers) {
+    worker.join();
+  }
+}
+
+void ThreadPool::enqueueTask(std::function<void()> task) {
+  {
+    std::unique_lock<std::mutex> lock(queueMutex);
+    tasks.push(std::move(task));
+  }
+  condition.notify_one();
+}
+
+void ThreadPool::workerThread(int thread_id) {
+  while (true) {
+    std::function<void()> task;
+    {
+      std::unique_lock<std::mutex> lock(queueMutex);
+      condition.wait(lock, [this] { return stop || !tasks.empty(); });
+      if (stop && tasks.empty()) {
+        return;
+      }
+      task = std::move(tasks.front());
+      tasks.pop();
+    }
+    task();
+  }
+}
+```
+
 **实现 defer**
 
 TODO
@@ -76,11 +139,13 @@ auto f = [&](int* p) {
 std::unique_ptr<int, decltype(f)> release_on_return(new int, f);
 ```
 
-**简易 benchmark**
+**简易 benchmark** / **计时**
 
 > 来自 https://zh.cppreference.com/w/cpp/algorithm/reduce
 > https://zh.cppreference.com/w/cpp/container/set/emplace
 > 其它可参考：https://zh.cppreference.com/w/cpp/language/attributes/likely
+>
+> 可以像 cppref likely 的示例代码一样用 `volatile int result` 作为函数结果来保证有副作用。
 
 ```cpp
 // 简单：
@@ -88,7 +153,7 @@ using Time = std::chrono::milliseconds;
 auto start = std::chrono::system_clock::now();
 // do sth
 auto ms = std::chrono::duration_cast<Time>(std::chrono::system_clock::now() - start);
-cout << ms << '\n';
+cout << ms.count() << '\n';
 
 //
 std::cout.imbue(std::locale("en_US.UTF-8"));
@@ -212,22 +277,22 @@ template<class T>
 struct Mallocator
 {
     typedef T value_type;
- 
+
     Mallocator() = default;
     template<class U>
     constexpr Mallocator(const Mallocator <U>&) noexcept {}
- 
+
     [[nodiscard]] T* allocate(std::size_t n)
     {
         // if (n > std::numeric_limits<std::size_t>::max() / sizeof(T))
         //    throw std::bad_array_new_length();
- 
+
         if (auto p = static_cast<T*>(std::malloc(n * sizeof(T))))
         {
             report(p, n);
             return p;
         }
- 
+
         throw std::bad_alloc();
     }
     void deallocate(T* p, std::size_t n) noexcept
@@ -307,7 +372,7 @@ int main()
 {
     // 创建使用自定义分配器的std::unordered_map
     TrackedMap<int, std::string> map;
-    
+
     // 添加一些元素
     map[1] = "One";
     map[2] = "Two";
@@ -420,42 +485,6 @@ T accumulate(InputIt first, InputIt last, T init) {
 }
 ```
 
-
-
-
-
-**字符串转数字**
-
-> https://zhuanlan.zhihu.com/p/618928075
-
-总结：用 stoi 系列；如果有 C++17 用 from_chars；stringstream 可以方便转换包含多个数字的字符串。
-
-- atoi、atol、atoll：很早的 C 函数，直接传递 const char*。
-    如果结果不能用对应类型表示则是 UB，即没有边界检查；当不能转换时直接返回0，不方便错误检查。
-- strtol、strtoll：C 的函数，传递 const char*，可以指定结束位置和数的进制。
-    如果结果不能用对应类型表示则设置 errno；当不能转换时直接返回0，不方便错误检查。
-- sscanf：C 的函数，因为缓冲区溢出和类型安全的问题很少用。
-- stringstream：可以直接用 operator >> 将数据输入到变量。通用但效率低。
-- stoi、stol、stoll、stoul、stof 等（常用）：传递 const string&，可以指定数的进制，可转换浮点。实际是调用 strtol。
-    如果结果不能用对应类型表示则设置 errno；当不能转换时抛出异常。
-- from_chars（C++17 起）：传递一对 const char* first, last，可以指定数的进制，可转换浮点。高效。
-    通过参数返回结果。返回类型为 from_chars_result，包含一个指针和一个错误码。
-    可以接收 string_view（stoi 只接收 string，因此传递 string\_view 时会拷贝创建一个 string）。
-- spanstream（C++23 起）：与 stringstream 类似，但效率高一点。
-
-**字符串转大写**
-
-```cpp
-// 1
-for (auto& c: s) c = toupper(c);
-// 2
-std::transform(s.begin(), s.end(), s.begin(), [](char c) { return std::toupper(c); });
-// 或
-std::transform(s.begin(), s.end(), s.begin(), ::toupper);
-// 注意这里不能用 std::toupper，只能用 C 的全局的 toupper，不知道为什么
-// 如果 C 用宏实现 toupper 就会出错
-```
-
 **获取随机数**
 
 `mt19937{ random_device{}() }`。
@@ -539,33 +568,6 @@ auto val = std::hash<vector<float>>{}(vec);
 
 注意，只能在 std 中添加模板特化，否则是 UB。具体见 *C++ - 在 std 中添加声明*。
 
-**在字符串中使用中文字符**
-
-```cpp
-// wchar_t、wstring 可以以 unicode 字符为单元存储数据，便于遍历
-// 但必须使用单独的一套函数，与 char、string 不同
-const wchar_t* s = L"山东省省委书记省abc"; // 带L前缀的是宽字符(串)字面量
-
-int count = 0, len = std::wcslen(s);
-for (int i = 0; i < len; ++i) {
-    count += (s[i] == L'省');
-}
-std::cout << count << '\n';
-
-// 或者直接将中文存入 char 数组，然后使用子串比较进行字符检查
-// 中文的各字节会被拆分成多个字节保存。但显然可能出错
-const char* s = "山东省省委书记省abc";
-const char *tmp = s;
-
-int count = 0;
-while ((tmp = std::strstr(tmp, "省")) != nullptr) {
-    std::cout << tmp << '\n';
-    ++tmp;
-	++count;
-}
-std::cout << count << '\n';
-```
-
 **间接排序**
 
 指根据 data 的大小排序下标数组，不改变 data 本身。用于对象较大的情况时，可减少交换操作。
@@ -599,12 +601,92 @@ int sign(T val) {
 但如果要在析构时做处理（比如调`t.join()`），则还是要保存`thread*`、手动释放`delete t`。通常没必要存 thread*，thread 也不大。
 
 
+### 字符串
+
+**EndsWith**
+
+```cpp
+auto endsWith = [&](const std::string& str, const std::string& suffix) {
+    if (suffix.size() > str.size()) {
+        return false;
+    }
+    return str.substr(str.size() - suffix.size()) == suffix;
+};
+```
 
 
+
+
+**字符串转数字**
+
+> https://zhuanlan.zhihu.com/p/618928075
+
+总结：用 stoi 系列；如果有 C++17 用 from_chars；stringstream 可以方便转换包含多个数字的字符串。
+
+- atoi、atol、atoll：很早的 C 函数，直接传递 const char*。
+    如果结果不能用对应类型表示则是 UB，即没有边界检查；当不能转换时直接返回0，不方便错误检查。
+- strtol、strtoll：C 的函数，传递 const char*，可以指定结束位置和数的进制。
+    如果结果不能用对应类型表示则设置 errno；当不能转换时直接返回0，不方便错误检查。
+- sscanf：C 的函数，因为缓冲区溢出和类型安全的问题很少用。
+- stringstream：可以直接用 operator >> 将数据输入到变量。通用但效率低。
+- stoi、stol、stoll、stoul、stof 等（常用）：传递 const string&，可以指定数的进制，可转换浮点。实际是调用 strtol。
+    如果结果不能用对应类型表示则设置 errno；当不能转换时抛出异常。
+- from_chars（C++17 起）：传递一对 const char* first, last，可以指定数的进制，可转换浮点。高效。
+    通过参数返回结果。返回类型为 from_chars_result，包含一个指针和一个错误码。
+    可以接收 string_view（stoi 只接收 string，因此传递 string\_view 时会拷贝创建一个 string）。
+- spanstream（C++23 起）：与 stringstream 类似，但效率高一点。
+
+**字符串转大写**
+
+```cpp
+// 1
+for (auto& c: s) c = toupper(c);
+// 2
+std::transform(s.begin(), s.end(), s.begin(), [](char c) { return std::toupper(c); });
+// 或
+std::transform(s.begin(), s.end(), s.begin(), ::toupper);
+// 注意这里不能用 std::toupper，只能用 C 的全局的 toupper，不知道为什么
+// 如果 C 用宏实现 toupper 就会出错
+```
+
+**在字符串中使用中文字符**
+
+```cpp
+// wchar_t、wstring 可以以 unicode 字符为单元存储数据，便于遍历
+// 但必须使用单独的一套函数，与 char、string 不同
+const wchar_t* s = L"山东省省委书记省abc"; // 带L前缀的是宽字符(串)字面量
+
+int count = 0, len = std::wcslen(s);
+for (int i = 0; i < len; ++i) {
+    count += (s[i] == L'省');
+}
+std::cout << count << '\n';
+
+// 或者直接将中文存入 char 数组，然后使用子串比较进行字符检查
+// 中文的各字节会被拆分成多个字节保存。但显然可能出错
+const char* s = "山东省省委书记省abc";
+const char *tmp = s;
+
+int count = 0;
+while ((tmp = std::strstr(tmp, "省")) != nullptr) {
+    std::cout << tmp << '\n';
+    ++tmp;
+	++count;
+}
+std::cout << count << '\n';
+```
 
 
 
 ### 输入输出
+
+**endl**
+
+[endl](https://zh.cppreference.com/w/cpp/io/manip/endl) 输出换行符到任何 basic_ostream 类型并进行 flush。会影响输出性能。
+
+> 多数实现中，标准输出 stdout（不包含文件输出）是行缓冲的，即写入'\n'也会导致 flush，除非执行过[`std::ios::sync_with_stdio(false)`](https://zh.cppreference.com/w/cpp/io/ios_base/sync_with_stdio)。
+>
+> 可以输出 std::flush 来 flush 不需要换行的输出。
 
 **ostream**
 
@@ -668,30 +750,17 @@ while (getline(input, line)) {
     istringstream in(line);
     int label;
     in >> label; // 从字符串 line 中读入一个整数
-    
+
     in >> buf; // 然后读入一个字符串
     cout << label << ": " << buf << '\n';
 }
 ```
 
-**ofstream**
-
-ifstream 以流输出的格式，将变量或字符串输出到文件中。
-
-```cpp
-std::ofstream fout(filename);
-fout << total_iteration_ << '\n';
-fout << weight_.size() << '\n';
-for (auto w: weight_) {
-    fout << w << ' ';
-}
-fout << '\n';
-```
-
 **ifstream**
 
 ifstream 以流输入的格式，将从文件中读取的字符串输入到变量中。
-如果文件不存在或打开失败，则 is_open 为 false。在析构时会自动 close，通常不需要手动调用。
+如果文件不存在或打开失败，则 is_open 为 false。
+虽然有 close 接口但不需要手动调用，能正确析构即可。
 
 ```cpp
 ifstream input(model);
@@ -701,6 +770,20 @@ input >> num_feature;
 for (size_t i = 0; i < num_feature; ++i) {
     input >> weight[i];
 }
+```
+
+**ofstream**
+
+ofstream 以流输出的格式，将变量或字符串输出到文件中。
+
+```cpp
+std::ofstream fout(filename);
+fout << total_iteration_ << '\n';
+fout << weight_.size() << '\n';
+for (auto w: weight_) {
+    fout << w << ' ';
+}
+fout << '\n';
 ```
 
 
@@ -765,7 +848,7 @@ template<class... Ts>
 struct A {
     // 通过`sizeof...`获取变长参数包中的参数数量
 	size_t nSize = sizeof...(Ts);
-	
+
     // 调用函数并连接，也可以是加减等二元运算符
     // 这类更推荐 std::conjunction？
 	static_assert(std::is_copy_constructible_v<Ts> && ...);
@@ -832,6 +915,51 @@ void Sort(T st, T ed, Func less = Func()) { // T是指针或迭代器
 
 见 *most vexing parse*。
 
+**三五零法则**
+
+如果需要析构释放资源，就应该定义或禁用拷贝/移动函数。
+
+```cpp
+struct C {
+    C(int x = 0) {
+        p = new int{x};
+    }
+    ~C() {
+        delete p;
+    }
+    int* p;
+};
+C c;
+c = C(2);
+cout << *c.p;
+```
+
+**const char\* 隐式转换为 string**
+
+见 *C++ - 引用初始化*。
+
+```cpp
+auto kRun = "run"; // const char*
+// const auto kRun = "run"; // const char* const，注意这个 const 是 top layer
+
+void Report(const std::string& s, int value) {}
+void ReportRunTime(int value) {
+  Report(kRun, value); // 每次调用都会拷贝一个 string。如果是 string_view 倒能省掉拷贝
+}
+// 更直观：string 不能直接绑定引用到 const char*，显然要构造并拷贝一个
+const string &rs = "run";
+```
+
+**条件运算符**
+
+见 *Quiz - 319*。
+
+```cpp
+double Get() {return 1.;}
+int64 key = 221795837984284688ll;
+int64 x = i == 0 ? key : Get();
+```
+
 **排序**
 
 ```cpp
@@ -878,7 +1006,7 @@ int main() {
 {
     vector<Node> v;
     // 获取v...
-    
+
     // 拷贝
     for (const auto &i: v)
         ans.add(i);
@@ -941,9 +1069,25 @@ f("abc"); // const char* 转为 string
 使用 const char* 做形参，可以避免产生临时变量、便于使用 C 函数。
 使用 string 做形参，获取长度方便（char* 需要从头遍历直到找到 \0 才能确定长度，或者自己带长度）、使用方便（如果此时不修改，更推荐 string_view）。
 
+**修改 string.data**
 
+（具体见 *STL - string*）string 要能支持转为 const char*，标准规定通过 c_str、data 返回的指针指向的字符串，其末尾一定要有空终止字符。通常情况下，为了避免拷贝、O(1) 直接完成转换，string 的实现仍然会在字符串的最后添加 \0（本质还是 Unix/C 字符串要以 \0 结尾带来的问题）。也因此，访问和修改 data[size] 通常不会导致写非法内存（但依然不建议使用，看实现）。
 
+```cpp
+string s(3, 'a'); // size, capacity 都是 3，但底层 buffer 实际是 4B
+s.data[3] = 'b';
+cout << s << '\n'; // aaa
+cout << s.data() << '\n'; // aaab
+```
 
+**指针**
+
+下面这种写法通常一个使用 unique\_ptr、一个使用 raw ptr。如果有需要也可以一个 shared\_ptr，一个 weak\_ptr？
+
+```cpp
+struct A { B* b; }
+struct B { A* a; }
+```
 
 
 
@@ -1007,7 +1151,7 @@ int f(int x) {
     int a;
     if(x)
         a = 42;
-    return a; 
+    return a;
 }
 ```
 

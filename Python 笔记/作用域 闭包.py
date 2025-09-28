@@ -32,8 +32,10 @@ print(n)
 
 '''
 global, nonlocal:
-当内部作用域想**修改**外部作用域的**不可变类型**（list, dict, set外）时，需使用global和nonlocal；但若只访问不修改，不需声明。（只要内部域中有任何修改语句，无论在哪，都应在第一次调用前先声明）
-当内部作用域要修改全局变量时，需先使用global声明；要修改嵌套作用域（enclosing作用域，外层但非全局作用域）中的变量时，需先使用nonlocal声明。
+当内部作用域想**修改**外部作用域的**不可变类型**（list, dict, set外）时，需使用 global 和 nonlocal 声明该外部变量，否则会被视为定义了一个新的局部变量；
+只要内部域中有任何修改语句，无论在哪，都应在第一次调用前先声明。
+但若只访问不修改，不需声明（会自动在外部作用域找该声明）。
+当内部作用域要修改全局变量时，需先使用 global 声明；要修改嵌套作用域（enclosing 作用域，外层但非全局作用域）中的变量时，需先使用 nonlocal 声明。
 '''
 # 只访问全局变量而不修改，不需声明。
 
@@ -47,8 +49,10 @@ print(x) # 0
 x=0
 def f():
 	global x
+	# x = 1 # 如果不加 global x，则这样是新建了一个局部变量
+	# x += 1 # 如果不加 global x，则这样找不到 x 的声明
 	print(x)
-	x+=1
+	# x = 1 # 如果不加 global x，则该作用域视 x 为局部变量（修改了），此时前面的 print(x) 会找不到 x 的声明
 f() # 0
 print(x) # 1
 # 未在第一次使用前声明，会报错：SyntaxError: name 'x' is used prior to global declaration
@@ -97,7 +101,17 @@ def outer():
 	print(x) # [1]
 outer()
 
-
+# ! 注意，if 不会引入新的作用域，所以函数可以访问在 if __name__ == "__main__" 内定义的变量，因为它们是全局（模块级）的
+def f():
+	# a = 1 # 未使用 global 声明时，这样是定义局部变量
+    print(a)
+def main():
+    a = 3 # 函数 f 不会读到该局部变量
+    f()
+if __name__ == "__main__":
+    a = 1 # 函数 f 可以读取该全局变量。如果修改需使用 global a 声明
+    f()
+    main()
 
 
 '''

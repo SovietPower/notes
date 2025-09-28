@@ -1,6 +1,6 @@
-# 面试 应用：游戏 docker
+# 应用：游戏 docker
 
-Tags: 实习
+Tags: 笔记
 
 
 -----

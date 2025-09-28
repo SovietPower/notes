@@ -60,6 +60,28 @@ L=[0]
 l.append(0)
 print(L) # [0]
 
+# - 注意，循环 list 同时删除其中的元素可能会导致错误
+print('- delete in loop')
+my_list = [1, 2, 3, 4, 5]
+l = my_list
+for i, value in enumerate(l):
+	if value % 2 == 0:  # 删除偶数
+		del l[i]
+print(l)
+
+# 1. 可以反向遍历 list 删除避免影响未处理的元素
+l = my_list
+for i in range(len(l) - 1, -1, -1):
+	if l[i] % 2 == 0:  # 删除偶数
+		del l[i]
+print(l)
+
+# 2. 创建新 list
+l = [value for value in my_list if value % 2 != 0]  # 保留奇数
+print(l)
+
+l = list(filter(lambda x: x % 2 != 0, my_list))  # 保留奇数
+print(l)
 
 'tuple'
 # tuple：有序元组，类似定长数组，但一旦初始化就不能修改，且定义时元素就需被确定。

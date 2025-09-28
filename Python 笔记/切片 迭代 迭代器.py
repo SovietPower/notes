@@ -88,7 +88,7 @@ print()
 for i, val in enumerate(("A", "B", "C")):
 	print("t[%d]=%s" % (i, val))
 
-for i, a in enumerate(d.items()):
+for i, a in enumerate(d.items()): # dict 也可 enumerate
 	print("%d: d[%s]=%d" % (i, a[0], a[1]))
 # print(type(enumerate([1, 2, 3]))) # <class 'enumerate'>
 

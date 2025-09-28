@@ -112,6 +112,8 @@ doc/**/*.pdf
 Git没有中心服务器。之前提到的Git命令均在本地执行。要通过Git分享代码或者与合作开发，就需要将数据放到一台其他人能连接的服务器上。
 比如使用Github作为远程仓库。
 
+
+
 ### 配置验证信息
 本地Git仓库和GitHub仓库之间的传输是通过SSH加密的，所以需配置验证信息。
 
@@ -135,6 +137,36 @@ Your public key has been saved in /c/Users/your_user/.ssh/id_rsa.pub
 
 可用`ssh -T git@github.com`测试是否连接成功：
 如果出现`You've successfully authenticated, but GitHub does not provide shell access.`即成功，如果出现`The authenticity of host 'github.com' can't be established.`，看一下输出的fingerprint是否与[Github的](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints)相同，如果相同输入yes再运行即可（不同就重新生成再试）。
+
+
+
+### 为多个用户配置
+
+每个生成的 key 仅能用于一个账户，如果需要多个，创建 key 时保存到另一个文件（如 id_rsa_github），然后配置 ssh：
+
+```shell
+touch ~/.ssh/config
+code ~/.ssh.config
+
+# 添加配置
+
+# Personal account, - the default config
+Host github.com
+   HostName github.com
+   User git
+   IdentityFile ~/.ssh/id_rsa
+
+# Work account-1
+Host github.com-SovietPower
+   HostName github.com
+   User git
+   IdentityFile ~/.ssh/id_rsa_soviet_power
+
+```
+
+
+
+
 
 ### 添加仓库
 

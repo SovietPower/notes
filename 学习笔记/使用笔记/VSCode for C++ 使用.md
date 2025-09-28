@@ -62,7 +62,44 @@ windows 建议使用 gcc，MSVC 不能生成 compile_commands，不能用 clangd
 
 > 会导致 doxygen 的文档生成有点问题，换行不会补 \*，但影响不大。
 
+**指定标准库路径 (include path)**
 
+[有三种方式](https://github.com/clangd/clangd/issues/1394#issuecomment-1328676884)：
+
+1. 全局安装最新的 gcc。
+2. 在 clangd  config 中添加`-Ipath`。
+   1. linux 配置文件：`~/.config/clangd/config.yaml`。
+3. 通过 CMakeLists 生成项目级的 compile_commands.json。
+
+示例：
+
+```bash
+mkdir build
+cd build
+cmake ..  # 如果版本不对就用 cmake3 ..
+```
+
+```cpp
+cmake_minimum_required(VERSION 3.10)
+project(MyProject LANGUAGES CXX)
+
+# 设置使用的编译器
+set(CMAKE_CXX_COMPILER "/opt/rh/devtoolset-9/root/usr/bin/gcc")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -std=c++20")
+
+# 指定源文件
+set(SRC_FILES
+    src/trie.cc
+)
+include_directories(
+    src
+    src/utils
+)
+
+add_executable(MyExecutable ${SRC_FILES})
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+```
 
 
 
@@ -288,6 +325,24 @@ cat /proc/cpuinfo| grep "processor"| wc -l
 ### 其它配置
 
 `workbench.action.holdLockedScrolling`：控制两个文件一起滚动。
+
+配置一个指定位置的[标尺](https://stackoverflow.com/questions/29968499/how-can-i-have-multiple-vertical-rulers-in-vs-code)，以检查某一行是否超过指定字符数（主要用于处理 lint check）：
+
+```json
+"[cpp]": { // 可指定语言
+   "editor.rulers": [
+      {
+        "column": 80,
+        "color": "#ff00FF"
+      },
+      100, // a ruler in the default color or as customized (with "editorRuler.foreground") at column 100
+      {
+        "column": 120,
+        "color": "#ff000050"
+      }, // 可指定多个和不同颜色。可以调低透明度
+   ]
+}
+```
 
 
 

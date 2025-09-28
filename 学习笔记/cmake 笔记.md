@@ -358,6 +358,8 @@ PUBLIC 等控制语义同上。
 
 很少用，推荐用其它命令。
 
+> 如果编译器不是 g++ 而是 gcc？需要手动 `target_link_libraries(MyExecutable stdc++)` 来链接标准库，否则会报大量标准库错误。
+
 **include_directories**
 
 `include_directories([AFTER|BEFORE] [SYSTEM] dir1 [dir2 ...])`
@@ -611,6 +613,8 @@ file(GLOB_RECURSE <variable> [FOLLOW_SYMLINKS] [LIST_DIRECTORIES true|false] [RE
 比如：递归添加 src 目录下的所有 .cc：`file(GLOB_RECURSE SOURCE "src/*.cc")`。
 
 不推荐使用，原因与 *aux_source_directory* 一致。
+
+> 每次使用会覆盖变量原本的值而非 append。如果想合并多次 file 的结果，需要写到不同 list 然后 list(APPEND ...)。
 
 [**message**](https://cmake.org/cmake/help/latest/command/message.html)
 

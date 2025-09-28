@@ -48,10 +48,13 @@ except ImportError:
 
 '模块搜索路径'
 当解释器遇到import语句时，会在搜索路径中查找该模块。
-搜索路径包括：1.当前目录；2.shell变量（Python环境变量）PYTHONPATH下的每一个目录；3.标准库的安装路径（默认路径）。
+搜索路径包括：1.当前目录（运行脚本的目录）；2.shell变量（Python环境变量）PYTHONPATH下的每一个目录；3.标准库的安装路径（默认路径）。
 添加搜索路径：
 1.直接修改sys.path：import sys后，使用sys.path.append('...')。该方法程序结束后失效，需重新修改。
 2.设置环境变量PYTHONPATH。永久生效。
+
+注意，假如在当前目录执行 a.py，a 引用 folder/b.py，b 中引用同目录的 folder/c.py，则 a 或 b 中要添加 folder 到 sys.path 才能找到 c。
+如果是在 folder 下执行就不需要添加目录就能找到 c 了。
 
 
 'BIF(Built-in Functions)'

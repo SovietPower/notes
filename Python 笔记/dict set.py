@@ -17,8 +17,9 @@ d["D"]=4 # 在dict中添加元素
 d.update({"D":4}) # 在dict中添加元素
 d["D"]=5 # dict中每个元素只能映射到一个元素，即最后赋值的那个
 
-# 若元素不在dict中，但进行了引用，会报错。需使用(not d.get("A"))判断，而不能用(not d["A"])。
+# 若元素不在dict中，但用 [] 进行了引用，会抛出 KeyError 异常。需使用(not d.get("A"))判断，而不能用(not d["A"])。
 print("E" in d) # x in dict 返回True/False，可判断x是否在某个dict中
+# 使用 get 即使不指定 default，在 key 不存在时也不会异常，而是返回 None
 print(d.get("A")) # dict.get(x) 可得到x在dict中的映射，若x不在dict中则返回None，或自定义的val（见下行）
 print(d.get("E"))
 print(d.get("E", 555)) # dict.get(x,val) 当x不在dict中时，返回val
@@ -33,6 +34,21 @@ print(d.pop("C")) # ccc
 key = [1, 2, 3]
 # d[key] = "unhashable type: 'list'" # Error
 
+print('---')
+# 注意，与 C++ 不同，直接执行 d1 = d2 会使 d1、d2 共享同一个 map
+import copy
+
+d1 = {"A": 1}
+d2 = d1 # 共享
+d3 = copy.copy(d1) # 浅拷贝，dict 本身不共享，但底层的数据结构（如 dict([], []) 中的 list）依然共享，等价于 d3 = d1.copy()
+d4 = copy.deepcopy(d1) # 深拷贝
+d1["B"] = 2
+print(d2)
+print(d3)
+print(d4)
+
+
+print('--- set')
 
 # set，类似C++中set，一组元素key的集合，无重复元素。注意该set**无序**（元素排序是不定的）。
 s = set([1, 2, 3]) # 用list作为输入参数，通过set(list)可创建set
