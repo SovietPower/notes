@@ -11,6 +11,10 @@
 > https://www.zhihu.com/column/c_1880282355366855965
 >
 > https://zhuanlan.zhihu.com/p/1900126076279160869
+>
+> vLLM显存管理详解：
+> https://www.zhihu.com/question/1985360471524664255/answer/1990753036251992692
+> http://zhuanlan.zhihu.com/p/1916529253169734444
 
 
 

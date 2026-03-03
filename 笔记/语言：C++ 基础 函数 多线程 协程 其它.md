@@ -152,7 +152,7 @@ Boost 提出用hpp做为 header-only library 的文件后缀。
 
 例外：类类型、枚举类型、内联函数、内联变量、模板，在满足以下条件时允许有多个定义：每个定义都出现在不同单元；不同单元中的定义均相同；...。
 
-在整个程序（包括所有的标准库）中，被 ODR 使用的非内联函数或变量必须有且仅有一个定义；内联函数或变量必须在每个 ODR 使用它的单元都有一个定义。否则非良构，但不要求诊断。
+在整个程序（包括所有的标准库）中，被 ODR 使用的非内联函数或变量必须有且仅有一个定义；内联函数或变量必须在每个 ODR 使用它的单元都有一个定义。否则非良构，但不要求诊断。见 [odr#10,11](https://timsong-cpp.github.io/cppwp/n4861/basic.def.odr#10)（definition domain 定义中的 module 是 20 的模块，一般就是指 TU，可以看 17 的标准）。
 
 **ODR 使用** / **ODR use**
 
@@ -160,7 +160,7 @@ Boost 提出用hpp做为 header-only library 的文件后缀。
 
 - 一个对象在它被读取（除非它是编译时常量）、写入、取地址或被引用绑定时，这个对象被 ODR 使用。
 - 如果一个引用所引用的对象在编译期未知，则使用该引用时，引用被 ODR 使用。
-- 一个函数在被调用或取地址时，被 ODR 使用。
+- 一个函数在被调用或取地址时，被 ODR 使用（内联了不算调用）。
 
 具体见 [ref](https://zh.cppreference.com/w/cpp/language/definition#ODR_.E4.BD.BF.E7.94.A8) 或[标准](https://timsong-cpp.github.io/cppwp/n4861/basic.def.odr#4)。
 
@@ -187,7 +187,8 @@ extern "C" 会避免函数进行 mangling。
 >
 > 见 https://www.zhihu.com/question/278587865。
 >
-> gcc 的 mangle 中可能有如下规则：如果是指针则在最前加 P；内建类型使用短字符串表示（如 _Z4funcid 后的 int, double），类名或函数名通过数字和对应个数的字母表示；N 代表一个 namespace 的起始，后接数字和对应个数的字母，表示命名空间名称，以 E 结束（如 _ZN4Name4funcEid）；如果是 std 命名空间则是 St 而非 N（如 _ZSt4funcid）。
+> gcc 的 mangle 中可能有如下规则：开头的 Z 代表 C++ 的符号，4 代表后面的字符串长度，如 4func。
+> 如果是指针则在最前加 P；内建类型使用短字符串表示（如 _Z4funcid 后的 int, double），类名或函数名通过数字和对应个数的字母表示；N 代表一个 namespace 的起始，后接数字和对应个数的字母，表示命名空间名称，以 E 结束（如 _ZN4Name4funcEid）；如果是 std 命名空间则是 St 而非 N（如 _ZSt4funcid）。
 
 > 汇编层面，读写某个非局部变量时，实际就是读写它的符号（类似的，调用某个函数，实际就是 call 它的符号）。链接就是将没有的符号定义导入。
 > 因此如果知道一个变量 mangle 后的名字 x，就可以通过该名字直接访问它（生成的汇编都是访问符号 x），比如：https://godbolt.org/z/YaE63sc6s（需要 extern 给出它的声明；如果不 extern 则是该符号重定义。全局作用域的变量可能不会被 mangle。extern 声明的函数会附加一个前缀，所以不行）。
@@ -2044,6 +2045,7 @@ int function(void) {
 
 TODO
 
+https://zhuanlan.zhihu.com/p/1892632711019073793
 https://blog.csdn.net/qq_55125921/article/details/128720696
 
 

@@ -102,6 +102,9 @@ public:
 private:
     std::function<void()> cleanupFunction;
 };
+// 注意这个需要改一下写法不能像下面一样
+#define defer(expr) Defer __defer##__LINE__ {[&]() expr}
+defer({ delete p; });
 
 // 使用模板、不存 function 可以减少开销
 // 缺点是创建大量实例化会使程序膨胀（比如单测中多次使用）
@@ -115,8 +118,8 @@ private:
 };
 
 // 封装，使其像 go 的 defer {...} 写法，不用每次创建 lambda
+// 需要 C++17 的 CTAD
 #define defer Defer __defer##__LINE__ = [&]()
-// 不过最后要加分号
 defer { delete p; };
 ```
 
@@ -139,7 +142,7 @@ auto f = [&](int* p) {
 std::unique_ptr<int, decltype(f)> release_on_return(new int, f);
 ```
 
-**简易 benchmark** / **计时**
+**简易 benchmark** / **计时 timer**
 
 > 来自 https://zh.cppreference.com/w/cpp/algorithm/reduce
 > https://zh.cppreference.com/w/cpp/container/set/emplace

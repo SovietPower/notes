@@ -518,15 +518,17 @@ MSVC 编译选项：
 `add_definitions(-DMACRO_NAME)`
 
 添加宏定义。-D 后加宏名。
-可在代码中使用，比如：`add_definitions(-DDEBUG)`，`#ifdef DEBUG`。
+可在代码中使用，比如：`add_definitions(-DDEBUG)`，`#ifdef DEBUG`；`add_definitions(-DFOO=1)`。
 
 [**target_compile_definitions**](https://cmake.org/cmake/help/latest/command/target_compile_definitions.html)
 
-`target_compile_definitions(<target> <INTERFACE|PUBLIC|PRIVATE> [items1...]...`
+`target_compile_definitions(<target> <INTERFACE|PUBLIC|PRIVATE> [items1...]...)`
 
 为特定目标设置编译选项。
 
-一个 item 可以是：`FOO`添加宏定义；`-DFOO`移除宏定义 FOO（注意空格是分隔符，不要多加）；`FOO=1`为宏定义设置值。
+一个 item 格式可以是：`FOO`添加宏定义；`-DFOO`移除宏定义 FOO（注意空格是分隔符，不要多加）；`FOO=1`为宏定义设置值。
+
+另见 *configure_file*。
 
 **add_subdirectory**
 

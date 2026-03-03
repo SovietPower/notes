@@ -27,6 +27,27 @@
 
 
 
+---
+
+## Latent Reasoning
+
+主流的显式推理（Explicit Reasoning, 如 CoT）会在生成时通过 token 展示推理过程，过程透明、可解释性强，但需生成更多 token、开销大。
+
+*隐式推理* (Latent Reasoning, Implicit Reasoning) 在模型内部 (latent space) 完成推理/思考过程，不在输出中展示中间步骤，然后直接给出最终答案。这就是最原本的模型生成过程。与显式相比可解释性差，但性能高，不会受 token 限制。
+（内部推理不是说一定对 output states 额外进行一些处理，正常的生成过程就是内部推理，显式推理前也会进行隐式推理，但也可以额外进行一些 hidden states 的运）
+
+Latent Reasoning 有多种实现和优化方式：
+
+- Signal-Guided Control：在 prompt 中插入特殊 token 来调控内部推理过程。特殊 token 可根据任务不同进行调整。
+- Token-level latent optimization：生成时用生成特殊 token (latent token) 取代生成 CoT。额外引入 token，对之前的语义进行归纳整理。
+  - 类似于还是进行 CoT，但思考过程仅产生少量特殊 token（不需要给人看，只需要对模型后续生成起指导作用，所以不需要生成大量文本），然后再生成答案。
+  - 可以在语义边界（如标点）前或周期性插入 latent token。
+
+- layer-recurrent execution：循环机制：让输出在某些层或整个模型反复迭代处理，以模拟深度的、迭代式的思考过程，可以在不增加模型参数量的情况下，有效增加计算深度（但没有降低计算量）。
+- Looped Transformers：让模型的某些层（或整个模型）循环执行多次，模拟 CoT 的 T 步推理。每一次循环相当于在潜在空间中生成一个思维步骤。
+- Inner Thinking Transformer：引入动态的、token 级别的深度缩放机制。通过一个路由网络，模型可以为序列中的关键 Token 分配额外的思考层（循环次数），从而实现计算资源的自适应分配（类似 MOE）。
+- Internal-state-level latent optimization：生成时用生成 emb 取代生成 CoT。将显式 CoT 监督信号转化为隐式 emb 表征，将结构化推理蒸馏为紧凑的内部表示。
+
 
 
 ---

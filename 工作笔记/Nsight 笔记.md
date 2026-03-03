@@ -88,7 +88,23 @@ ncu --set full -o report -f ./main
 
 
 
+### Summary
+
+- estimated speedup/runtime improvement：该 kernel 最多能有多少性能提升。
+- compute throughput：整个采样期间，SM 级别实际执行吞吐 / 理论可持续峰值 的百分比（理论峰值假设每个 SM 内部的 SMSP 负载完全均衡）。
+  - 是一系列`sm__instruction_throughput`和`sm__memory_throughput`指标 (Compute Throughput Breakdown) 的最大值，见[这里](https://stackoverflow.com/questions/63403203/terminology-used-in-nsight-compute)。
+  - SMSP: SM sub partition，一个SM被分为4个SMSP，每个SMSP管理固定数量的warp。一个SMSP通常包含一个warp scheduler，一个指令发射单元， 一部分寄存器文件，一组执行单元。每个SMSP在一个cycle最多发射1条warp指令。
+- memory throughput：计算相关的内存访问流水线，达到了硬件可持续峰值带宽的百分比。
+  - 实际上反映了一系列存储单元相关指标 (Memory Throughput Breakdown) 的最大值。
+-  num of registers：每个线程分配到的寄存器个数。
+- grid/block size
+
+
+
 ### GPU Speed Of Light Throughput
+
+- Compute (SM) Throughput [%]：即 Summary 中的对应值，一系列子指标的最大值，子指标可见 Compute Throughput Breakdown。
+- Memory Throughput [%]：即 Summary 中的对应值，一系列子指标的最大值，子指标可见 Memory Throughput Breakdown。
 
 通过 SOL section (speed of light) 可以初步判断程序的瓶颈：
 
@@ -107,9 +123,9 @@ ncu --set full -o report -f ./main
 Roofline 模型定义的模型的计算性能瓶颈 $P=\min\{P_{peak},\ I*b_s\}$。
 Roofline 模型的横坐标为 I，纵坐标为 P，当 $P\lt P_{peak}$ 时计算性能会随着 $I$ 增加而增加（斜率为 $b_s$）；当 $I$ 到达平台算力上限 $I_{max}$ 时计算性能 $P$ 到达最大值 $P_{peak}$ 不再增加。因此坐标图就是一条斜线+横线的屋顶状。
 
-因此当 $I\lt I_{max}$ 时，模型的计算性能受限于宽带，是 memory bound；当 $I\geq I_{max}$ 时，计算性能已达到平台算力上限，是 compute bound。模型的计算强度应尽可能接近 $I_{max}$，但超出后就没意义了。
+因此当横坐标 $I\lt I_{max}$ 时，模型的计算性能受限于宽带，是 memory bound；当 $I\geq I_{max}$ 时，计算性能已达到平台算力上限，是 compute bound。模型的计算强度应尽可能接近 $I_{max}$，但超出后就没意义了。
 
-> 如果模型位于拐点 $I_{max}$ 左侧且位于斜线下方，则说明是 mem bound，且还没有完全利用最大带宽 $b_s$，导致计算性能比理论的最高值 $I*b_s$ 还低。
+> 如果模型位于拐点 $I_{max}$ 左侧且位于斜线下方，则说明是 mem bound，且还没有完全利用最大带宽 $b_s$，导致计算性能比理论的最高值 $I*b_s$ 还低。此时模型纵坐标到斜线 $I*b_s$ 的距离（实际值和理论峰值）即为计算性能的提升空间。
 
 
 
@@ -126,7 +142,17 @@ GPU 中不同精度的浮点计算由各自专门的计算单元独立完成。
 >
 > 每条指令只有一条合适的流水线，除了 FP32 FADD/FFMA/FMUL 和 FP16 有 FMAHeavy 和 Lite 两条。
 
-Pipe Utilization 显示了主要计算单元的利用率情况（通过每个计算单元活跃的周期数，或该单元执行的 warp 指令数这些指标统计；反映了硬件单元活跃时，各子单元实例实际利用的性能与其理论峰值性能的比例），包括：
+Pipe Utilization 显示了主要计算单元的利用率情况，通过每个计算单元活跃的周期数，或该单元执行的 warp 指令数这些指标统计；反映了硬件单元活跃时，各子单元实例实际利用的性能与其理论峰值性能的比例：
+
+- % of active cycles：在 SM 活跃期间，有多少比例的周期该流水线在执行至少一条指令；
+- % of peak instructions executed：该流水线实际执行的指令数，占它理论执行指令数峰值的百分比。
+
+> - active cycles高，peak inst高：理想状态。
+> - active cycles高，peak inst低：pipeline经常被使用，但每次用得不满，可能是warp数不够或指令之间无法并行。
+> - active cycles低，peak inst高：指令mix不平衡，或者该pipeline不是瓶颈。
+> - active cycles低，peak inst低：指令类型几乎不用该pipeline，或被其他瓶颈完全压制。
+
+包括：
 
 - FMA (Fused Multiply Add/Accumulate，融合乘加；FP32 core?)：FMA 流水线处理大多数的 FP32 计算 (FADD, FMUL, FMAD, ...)。它还执行整数乘法运算 (IMUL, IMAD) 和整数点积。
   由 FMAHeavy 和 FMALite 两条物理流水线组成。

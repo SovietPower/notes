@@ -862,7 +862,7 @@ if (expr) {
 
 [once](https://en.wikipedia.org/wiki/Pragma_once) 可避免一个头文件被编译多次。
 
-与符合标准的 #ifndef、#define、#endif（include guard）相比：
+与符合标准的 #ifndef、#define、#endif (include guard, multiple include optimization) 相比：
 
 - once 不是标准的，只是受大多数现代编译器支持，某些情况可能不兼容，此时也不会导致 CE。
     两种方法可以同时用：在 #ifndef 前加 #pragma once。这样即使编译器不支持也不会影响正确性。
@@ -872,6 +872,8 @@ if (expr) {
     once 没有该问题。但由于是根据文件路径检查，如果某个头文件在项目中出现多次，也会编译多次（但很好发现该错误。但如果依赖关系复杂、引用库的数量多可能很难？）。
 
 总的来说不用在意用哪个。最好是一起用。
+
+> 编译器可以识别 `#ifndef xx` `#define xx` `...` `#endif` 这个 pattern，但编译器可能会有一些要求：gcc 和 MSVC 都要求 #ifndef 之前、#endif 之后没有其它代码（但允许空格和注释）。
 
 **#pragma pack**
 

@@ -12,7 +12,10 @@ TODO：
 
 https://zhuanlan.zhihu.com/p/1903729394792511360
 
-
+> 1. Qwen3MoE native 实现：[hugging face](https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen3_moe/modeling_qwen3_moe.py)
+> 2. FusedMoE优化：[sglang](https://github.com/sgl-project/sglang/blob/4db463b1ad6edcd6b8cd500be377f65ff8e3b419/python/sglang/srt/models/qwen3_moe.py)
+> 3. EP Moe: [sglang](https://github.com/sgl-project/sglang/commit/e330f2b86cd23f1acec113378aebd7bee268830b)
+> 4. DeepEP: [sglang](https://github.com/sgl-project/sglang/pull/6120)
 
 
 
@@ -21,6 +24,10 @@ https://zhuanlan.zhihu.com/p/1903729394792511360
 ## MOE
 
 > https://huggingface.co/blog/zh/moe
+
+
+
+通过 topk 等方式，仅选择部分专家执行的 MOE 称为 **sparse MOE**。
 
 
 

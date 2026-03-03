@@ -12,7 +12,7 @@
 
 
 
-
+- 因为 FFN 有比较多的模型参数，所以很多的内存占用和推理耗时来自于 FFN（且不低于 attention）；某些模型中，FFN 耗时可能会远高于 attention（如 Mixtral 8x7B）。
 
 
 
@@ -30,7 +30,7 @@
 
 ## Weight Sparsity
 
-稀疏性 weight_sparsity 就是 0 权重在所有权重中的比例，可据此进行模型压缩和加速推理。
+稀疏性 weight_sparsity 就是 0 权重在所有权重中的比例，可据此进行模型压缩和加速推理（利用硬件？）。
 
 稀疏性分类：
 
@@ -83,7 +83,25 @@ LLM 通常是自回归的 transformer，常规的 batching 有三个问题：
 
 ---
 
-## PD 分离
+## chunked prefill
+
+将 prompt 拆为固定 size 的若干块，依次进行多轮 prefill。
+
+- 可以减少内存占用？每轮 prefill 的长度变少了。
+- 在 PD 分离时可以平衡 TTFT 和 TPOT？P 的长度变少了，可以更经常让 D 执行。
+
+设输入长度为 n，分成 m 块，即chunked_size=n/m：
+
+- 访存：正常需要读写 n token 的 kv cache，cp 需要读取 $n/m*\sum_{i=1}^mi=n*(m+1)/2=O(nm)$，即切分越多访存冗余越大。冗余来自每次 prefill 都需要读取前面 i 块的 kv cache。
+- 计算：正常计算量为 n\*n，cp 需要 $n/m*\sum_{i=1}^mi*n/m=n^2(m+1)/2m$，切分越大计算量越少，因为把原先的大矩乘变成了多块小矩乘，它们只是大矩乘的下三角。
+
+
+
+
+
+---
+
+## PD 分离, P/D Disaggregation
 
 常规推理框架中 prefill 和 decode 阶段通常由同一个 GPU 执行。推理引擎的调度器会根据显存使用情况及请求队列状态，在 prefill 和 decode 之间切换。
 而 Prefill-Decode 分离式架构会将 prefill decode 拆分到不同的 GPU 实例上独立运行。prefill instance 和 decode instance 分别专注于 prefill 和 decode 阶段任务；prefill instance 计算完后会将 kv 传递给 decode instance。
@@ -123,7 +141,7 @@ PD 分离架构可以分别为两个阶段选择最优的并行策略。
 
 > https://zhuanlan.zhihu.com/p/18056041194
 >
-> https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/advanced/speculative-decoding.md
+> https://github.com/NVIDIA/TensorRT-LLM/blob/release/1.0/docs/source/advanced/speculative-decoding.md
 
 主流的大模型都是基于 decoder 的，无论是训练还是推理，在生成序列时都需要 token-by-token。每次生成一个 token 时，都要频繁访存、加载 KV cache，因此访存会成为训练和推理的瓶颈。
 
@@ -131,6 +149,8 @@ PD 分离架构可以分别为两个阶段选择最优的并行策略。
 在训练阶段，一次生成多个 token，可以一次学习多个位置的 label，提高样本利用效率，提升训练速度；在推理阶段，一次生成多个 token 可成倍加速推理。
 
 投机采样会生成一序列的 token，称为 draft token，然后将这些 token 输入原始模型一次完成验证、决定留下多少 token。
+
+> 好像不是一个东西？MTP 是投机采样的一种？
 
 以 TensorRT-LLM 为例，有多种生成 draft tokens 的方式：
 
@@ -167,14 +187,23 @@ Google 18 年提出的结构：
 
 ## LoRA
 
-低秩分解 (LoRA, Low-Rank Adaptation) 是一种轻量级的微调方法，适用于大型预训练模型。传统的微调通常需要更新整个模型的参数，这在大模型中会带来巨大的计算和存储开销。LoRA 通过引入低秩矩阵来减少需要更新的参数数量，从而显著降低微调的成本。
+低秩分解 (LoRA, Low-Rank Adaptation) 是一种轻量级的多任务微调方法，适用于大型预训练模型。
+传统的微调通常需要更新整个模型的参数，会带来巨大的计算和存储开销。LoRA 引入低秩矩阵来减少需要更新的参数数量，从而显著降低微调的成本。
 
-LoRA 假设模型的权重矩阵在微调过程中可以通过低秩矩阵进行有效更新：对于一个权重矩阵 $W\in R^{m\times n}$，LoRA 认为其更新量 $\Delta W$ 可以用两个低秩矩阵 $A\in R^{m\times r}, B\in R^{r\times n}$ 的乘积来表示：$\Delta W=A\cdot B$，其中 $r\ll m,n$。
+LoRA 假设模型的权重矩阵在微调过程中可以通过低秩矩阵进行有效更新：对于一个权重矩阵 $W\in R^{m\times n}$，LoRA 认为其更新量 $\Delta W$ 可以用两个低秩矩阵 $A\in R^{m\times r}, B\in R^{r\times n}$ 的乘积来表示：$\Delta W \approx A \times B$，其中 $r\ll m,n$。
 这种低秩假设意味着尽管权重矩阵本身可能很大，但其更新量可以用少量参数（低秩矩阵）来捕捉。这大大减少了需要训练的参数数量，同时保留了足够的表达能力。
 
-LoRA 通过限制更新的参数数量，可以有效防止过拟合：由于低秩矩阵 A, B 的参数数量远小于原始权重矩阵，模型的容量被限制，从而降低了过拟合的风险。这在数据量较小的任务中非常重要。
+推理时，原始模型为 $h=Wx+b$，使用 Lora 微调后为（冻结 W，引入训练的 A, B 计算参数更新）：$h=(W+\Delta W)x+b=Wx+b+(AB)x$
+
+意义：
+
+- LoRA 通过限制更新的参数数量，可以有效防止过拟合：由于低秩矩阵 A, B 的参数数量远小于原始权重矩阵，模型的容量被限制，从而降低过拟合的风险。这在数据量较小的任务中非常重要。
+- 多任务推理时，只需加载一个基础模型和若干组小 LoRA 权重，就可用一份权重处理多个微调任务，节省显存。
+  （会引入额外矩乘，但 AB 的秩非常小，开销极低）
 
 > 从理论上看，LoRA 的有效性可以通过矩阵分解和低秩近似来解释。许多研究表明，高维矩阵的更新量通常具有低秩特性，因此用低秩矩阵来近似更新量是合理的。此外，低秩更新在数学上等价于对模型的某些特征空间进行局部调整，这种调整通常足以捕捉任务特定的信息。
+
+
 
 
 
@@ -215,7 +244,47 @@ Parallel Scaling 将一个输入通过可学习的变换变为 P 个（在输入
 
 
 
+---
 
+## Prefix Caching
+
+> https://docs.vllm.ai/en/stable/design/prefix_caching
+
+除了可以对 prompt prefill 结果做缓存外（见 *SGLang - RadixAttention*），还可以对 decode 生成的结果做缓存，这样在多轮对话中就无需再为之前生成的内容做 prefill。
+
+vllm 通过哈希实现：对每个 kv cache block，vllm 记录该 block 的哈希值和该 block 之前的前缀的哈希值（如果它不是第一块），用于在后续请求时检查能复用多少 kv cache。
+缓存的单位是 block（可能有多个 token），如果有某个 token 不匹配也需要重算（但 block 不大的话代价很低）。
+
+**Automatic Prefix Caching**
+
+vllm 的 [APC](https://docs.vllm.ai/en/stable/features/automatic_prefix_caching/) 可以缓存输出 token 的 kv cache，减少后续请求进行 prefill 的时间。适用于多轮对话。
+
+
+
+---
+
+## Lazy Decoder
+
+> https://arxiv.org/pdf/2508.20900
+> https://zhuanlan.zhihu.com/p/1945765458063098684
+> https://zhuanlan.zhihu.com/p/1944782702847963754
+
+transformer 中大部分的计算量都在 cross attention 的 KV 计算上：假设 hidden=1024：
+
+- Wq：1*1024 * 1024*1024 = 1M
+- self attention：
+  - Wk/Wv：1*1024 * 1024*1024 *2 = 2M
+  - Q\*K + softmax\*V：1*1024 * 1024*step *2 = 6K
+- cross attention：
+  - Wk/Wv：128*1024 * 1024*1024 *2 = 256M
+  - Q\*K + softmax\*V：1*1024 * 1024*128 *2 = 256K
+- FFN：(1\*1024 * 1024\*4096 + 1\*4096 * 4096\*1024) * 2 = 16M
+
+因此去掉 cross KV 的计算可以大大降低计算量。
+
+Lazy Decoder 使用一个 context processor 来处理原本 encoder 的输入（用户特征）并生成 KV，而不是在模型中用矩乘生成 KV。这样模型变成了 decoder-only，移除了 encoder 和 KV 计算，但保留了 cross attention 对输入序列的处理能力。
+
+KV 可以使用相同值、各层之间可以共享 KV，可进一步减少计算量。
 
 
 
