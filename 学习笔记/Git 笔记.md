@@ -842,11 +842,14 @@ origin  https://github.com/SovietPower/MIT-6.824-Labs.git (push)
 
 同步到主仓库记录的特定 commit 或分支：`git submodule update [<子模块路径>]`。不指定子模块路径则更新所有。
 
+- 如：`git submodule update --init --recursive`
+
 可选参数：
 
 - --init：初始化尚未初始化的 submodule。
 - --recursive：递归处理嵌套的 submodule。
 - --remote：更新到远程分支的最新 commit。
+- --progress：显示更新过程。
 
 **删除子模块**
 

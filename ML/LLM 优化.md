@@ -18,6 +18,22 @@
 
 ---
 
+## Parallelism
+
+### TP
+
+
+
+
+
+### DP
+
+> TP+DP 见 *SGLang - DP Attention*。
+
+
+
+---
+
 ## AWQ
 
 > https://zhuanlan.zhihu.com/p/697761176
@@ -109,6 +125,8 @@ LLM 通常是自回归的 transformer，常规的 batching 有三个问题：
 当不分离时，由于两阶段的计算特性差异（prefill 是计算密集，decode 是访存密集），可能难以充分利用 gpu 的资源，难以同时优化 TTFT 和 TPOT（需要取舍）；通过 PD 分离，可以针对不同阶段的特性分别进行优化，同时优化首 token 延迟和吞吐量。
 
 > 在不分离时，vllm 和 sglang 都是 prefill (TTFT) 优先，如果同时有 PD 任务，则只要有空余显存就会先处理 prefill，直到显存不足才会进行 decode 完成请求释放显存；如果进行分离，decode 就不会受 prefill 干扰，降低 TPOT。
+>
+> 如果用同种卡型，PD 分离对吞吐没有提升，只能降低 TPOT p99 使用户体验更好（但在相同 sla 约束下，降低 p99 就能提高吞吐）。
 
 **计算与访存优化**
 
@@ -249,15 +267,20 @@ Parallel Scaling 将一个输入通过可学习的变换变为 P 个（在输入
 ## Prefix Caching
 
 > https://docs.vllm.ai/en/stable/design/prefix_caching
+> https://sgl-project-sglang-93.mintlify.app/concepts/radix-attention
 
-除了可以对 prompt prefill 结果做缓存外（见 *SGLang - RadixAttention*），还可以对 decode 生成的结果做缓存，这样在多轮对话中就无需再为之前生成的内容做 prefill。
+除了可以对 prompt prefill 结果做缓存外，还可以对 decode 生成的结果做缓存，这样在多轮对话中就无需再为之前生成的内容做 prefill。
 
 vllm 通过哈希实现：对每个 kv cache block，vllm 记录该 block 的哈希值和该 block 之前的前缀的哈希值（如果它不是第一块），用于在后续请求时检查能复用多少 kv cache。
 缓存的单位是 block（可能有多个 token），如果有某个 token 不匹配也需要重算（但 block 不大的话代价很低）。
 
 **Automatic Prefix Caching**
 
-vllm 的 [APC](https://docs.vllm.ai/en/stable/features/automatic_prefix_caching/) 可以缓存输出 token 的 kv cache，减少后续请求进行 prefill 的时间。适用于多轮对话。
+vllm 称为 [APC](https://docs.vllm.ai/en/stable/features/automatic_prefix_caching/)，可以缓存输出 token 的 kv cache，减少后续请求进行 prefill 的时间。适用于多轮对话。
+
+**RadixAttention**
+
+SGLang 称为 RadixAttention / prefix caching。
 
 
 

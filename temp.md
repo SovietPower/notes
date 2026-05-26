@@ -2,7 +2,7 @@
 
 
 
-$\LaTeX$  .ere $\sum_{i=1}^nC_i$ ere
+$\LaTeX$   $\sum_{i=1}^nC_i$ 
 
 $$\prod_j $$
 

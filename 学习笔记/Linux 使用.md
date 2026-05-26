@@ -43,6 +43,50 @@ https://segmentfault.com/a/1190000038313883
 
 
 
+### 用户切换
+
+切换用户有两种方式。
+
+**su** (Switch User)
+
+`su [选项] [user] [参数]`
+
+- `su <user>`：仅切换用户，保留当前环境。
+- `su - <user>`：切换用户，并模拟完整登录。
+- `su -l <user>`：切换用户，并加载完整环境。`-l`是`--login`缩写。
+- `su -s /bin/bash <user>`：切换到用户并指定 shell。
+- `su -c <cmd> <user>`：以指定身份执行命令。
+
+模拟登录相当于重新登录，包括：
+
+- 执行 `/etc/profile`, `~/.bash_profile`, `~/.bashrc`。
+- 切换到目标用户的 home 目录。
+- 完全重置环境变量。
+
+> 当 <user> 为空时，使用 root。
+>
+> 常见：`su -`切换 root；`su -c <cmd>`以 root 身份执行命令。
+
+**sudo** (Superuser DO)
+
+`sudo [选项] [-u <user>] [命令]`
+
+- `sudo -u <user> <cmd>`：以指定用户的身份执行命令。
+- `sudo -iu <user>`：以指定用户的身份登录 shell。相当于`su - <user>`，但使用自己的密码。
+- `sudo -su <user>`：启动指定用户的 shell，只加载`~/.bashrc`，不加载`/etc/profile`, `~/.profile`，保持工作目录。
+
+> 当 <user> 为空时，使用 root。
+>
+> 常见：`sudo <cmd>`以 root 身份执行命令；`sudo -i`切换到 root。
+
+su 与 sudo 区别是：
+
+- su 只需要目标用户的密码；sudo 不需要目标用户密码，但需要确认当前用户的密码，并确认当前用户在`/etc/sudoers`中。
+- sudo 可以更细粒度控制权限，可在`sudoers`中控制某用户能用 sudo 执行什么命令；而 su 只要有密码就有一切权限，无法控制。
+- su 会彻底切换身份，执行日志不会记录原执行人是谁（只能记录它的 su）；sudo 会记录执行命令的原用户，而非切换后的 root。
+
+
+
 ----------
 ## 快捷键
 ### 终端快捷键

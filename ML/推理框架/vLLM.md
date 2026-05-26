@@ -15,6 +15,8 @@
 > vLLM显存管理详解：
 > https://www.zhihu.com/question/1985360471524664255/answer/1990753036251992692
 > http://zhuanlan.zhihu.com/p/1916529253169734444
+>
+> 模型部署文档：https://recipes.vllm.ai/
 
 
 

@@ -14,6 +14,8 @@
 >
 > TODO：
 > 与 deepseek 的优化：https://lmsys.org/blog/2024-12-04-sglang-v0-4/，https://docs.sglang.ai/references/deepseek.html
+>
+> 模型部署文档：https://docs.sglang.io/cookbook/autoregressive/intro
 
 SGLang: Structured Generation Language for LLMs.
 
@@ -175,21 +177,7 @@ SglExpr 可通过 + 或 concatenate_ir 合并成 SglExprList（也是一个 SglE
 
 ## 后端代码
 
-
-
-### Engine
-
-> https://docs.sglang.ai/backend/offline_engine_api.html
-
-通过 api 中的 `sglang.engine` 创建一个 `sglang.srt.entrypoints.engine.Engine(*args, **kwargs)`。
-
-Engine 是 infer server 的入口点，提供 infer engine 的接口。
-
-
-
-
-
-
+见 *SGLang 后端代码*。
 
 
 
@@ -198,74 +186,6 @@ Engine 是 infer server 的入口点，提供 infer engine 的接口。
 ## FlashInfer
 
 > https://arxiv.org/pdf/2501.01005
-
-
-
-
-
-
-
-
-
----
-
-## 优化
-
-> https://arxiv.org/pdf/2312.07104
-
-RadixAttention、Compressed finite state machines、API Speculative Execution 是 SGLang Runtime (SRT, backend) 的主要优化。
-
-**其它优化**
-
-> EP：https://zhuanlan.zhihu.com/p/17790182311
-
-
-
-### Radix Attention / Prefix Caching
-
-RadixAttention 就是利用带压缩前缀树来缓存 KV cache：相同前缀的请求会在树上共享同一个节点、共享 cache。
-
-- 缓存淘汰策略是 LRU。只会淘汰叶节点，然后才能淘汰因失去叶子变成叶节点的节点。
-- 在 continuous batching 中，无法在每次 batch 后清理无用节点上的 cache，所以会为每个节点维护引用计数，计数非 0 的节点不会被驱逐。
-- cache 会与正在执行的请求共享可用内存，这样当有足够的请求在执行时，系统可以驱逐所有已缓存的 token，以支持更大的 batch size。
-
-
-
-**cache-aware scheduling**
-
-cache 的命中率为 number of cached prompt tokens / number of prompt tokens。
-当等待队列有大量请求（cache 容量不足）时，执行请求的顺序会显著影响缓存命中率。如果调度程序频繁地在不同的、不相关的请求之间切换，会导致 cache 抖动和命中率低。
-
-这个调度算法按公共前缀长度对请求进行排序，并优先处理具有较长匹配前缀的请求，而不是使用 FIFO、按请求到来时间进行调度。
-
-对于一 batch 请求，在 trie 上 DFS 依次处理可以实现最高的 cache 命中率；而按公共前缀长度进行依次处理可以实现接近的效果。
-
-> 这种贪心调度会导致饥饿，还需要和其它公平调度结合。
-
-
-
-### Fast Constrained Decoding / Guided Decoding
-
-> https://github.com/zhaochenyang20/Awesome-ML-SYS-Tutorial/blob/main/sglang/constraint-decoding/readme.md
-
-Effcient Constrained Decoding with Compressed Finite State Machine：*fast constrained decoding* 允许在特定约束条件下一次生成多个 token，适合结构化输出。
-
-用户可以提供正则表达式来表示该约束，系统会据此构建一个压缩有限状态机，并在推理时维护 FSM 的状态。
-当对于给定输入，当前状态机只允许唯一的有效输出时，会直接通过状态机得到后面的若干 token，不经过 LLM decode，直到遇到非唯一的状态。不过还需要一次 prefill。
-
-**Handling Tokenization Artifacts with Retokenization**
-
-状态机是用字符串构建的，所以通过它一次得到多个输出后，还需将字符串转为 token。
-需要 retokenization（TODO）。
-
-
-
-###  API Speculative Execution
-
-Effcient Endpoint Calling with API Speculative Execution：SGLang 提供了前端和解释器，而后端可以用 API 访问 API-access-only model。
-对于这种 API 访问，SGL 通过投机执行来减少 API 调用次数和延迟：在调用 API 时，SGL 会忽略用户的停止条件，让模型生成更多 token；解释器会保留额外的生成输出，并用它匹配和重用于之后的用户请求。如果成功匹配，可以为用户省下一次 API 调用和耗时。
-
-尤其适用于连续两次调用且之间没有其它内容？可以把下一次调用的格式放在请求里？
 
 
 

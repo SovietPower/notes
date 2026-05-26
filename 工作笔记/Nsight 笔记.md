@@ -32,6 +32,19 @@
 
 - 深蓝色的条有两种：对 kernel 的调用 kernel launcher 和对应的 kernel 执行。它们都会显示这次 launch 的 latency（前者是箭头向后，后者是箭头向前）。
 
+点击 kernel 时，除了名字外还和看到以下信息：
+
+- grid, block：kernel 的执行配置。
+- Static Shared Memory：编译时确定的共享内存用量（静态）。
+- Dynamic Shared Memory：运行时分配的共享内存量（动态）（每个 block 的？）。
+- Registers Per Thread：每个线程使用的寄存器数量，高寄存器压力会降低 Occupancy。
+- Local Memory Per Thread：每个线程使用的本地内存，一般是溢出到全局内存的变量，即编译器无法将所有变量放入寄存器或共享内存。期望为 0。
+- Local Memory Total：所有线程还是所有 kernel 的本地内存总量？
+- Shared Memory executed：实际使用的共享内存。
+- **Theoretical occupancy**：理论占用率，当前 SM 理论活跃的最大 warp 比例。受寄存器数、共享内存、block 数量等影响。
+  - 较高的 occupancy 不一定会提高性能（比如每个线程确实需要那么多寄存器），但过低的值往往会影响。
+
+
 
 
 
@@ -93,7 +106,8 @@ ncu --set full -o report -f ./main
 - estimated speedup/runtime improvement：该 kernel 最多能有多少性能提升。
 - compute throughput：整个采样期间，SM 级别实际执行吞吐 / 理论可持续峰值 的百分比（理论峰值假设每个 SM 内部的 SMSP 负载完全均衡）。
   - 是一系列`sm__instruction_throughput`和`sm__memory_throughput`指标 (Compute Throughput Breakdown) 的最大值，见[这里](https://stackoverflow.com/questions/63403203/terminology-used-in-nsight-compute)。
-  - SMSP: SM sub partition，一个SM被分为4个SMSP，每个SMSP管理固定数量的warp。一个SMSP通常包含一个warp scheduler，一个指令发射单元， 一部分寄存器文件，一组执行单元。每个SMSP在一个cycle最多发射1条warp指令。
+  - *SMSP*: SM sub partition/sub core，见 *cuda 笔记 - SMSP*。
+    有些指标是以 SMSP 为单位统计的，因此前缀是`smsp_`而非`sm_`，SM 的结果可以用 SMSP avg * 数量得到。
 - memory throughput：计算相关的内存访问流水线，达到了硬件可持续峰值带宽的百分比。
   - 实际上反映了一系列存储单元相关指标 (Memory Throughput Breakdown) 的最大值。
 -  num of registers：每个线程分配到的寄存器个数。
@@ -141,6 +155,8 @@ GPU 中不同精度的浮点计算由各自专门的计算单元独立完成。
 > 不同架构不同型号的 GPU 之间，FP32 core 与 FP64 core 的数量可能相差很大，如 Turing 没有 FP64 core；Ampere 中两者比例为 64:1，因此单双精度性能也差 64 倍。
 >
 > 每条指令只有一条合适的流水线，除了 FP32 FADD/FFMA/FMUL 和 FP16 有 FMAHeavy 和 Lite 两条。
+>
+> 由于计算单元数量限制，一个 warp 的一条某运算指令可能需多个周期完成，这之间就可以插入其它单元的指令。
 
 Pipe Utilization 显示了主要计算单元的利用率情况，通过每个计算单元活跃的周期数，或该单元执行的 warp 指令数这些指标统计；反映了硬件单元活跃时，各子单元实例实际利用的性能与其理论峰值性能的比例：
 

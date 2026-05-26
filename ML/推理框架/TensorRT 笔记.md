@@ -492,6 +492,10 @@ TODO
 
 
 
+### Determinism
+
+> 输出的确定性：https://docs.nvidia.com/deeplearning/tensorrt/latest/architecture/how-trt-works.html#determinism
+
 
 
 

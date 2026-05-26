@@ -90,6 +90,62 @@ def gen_logger(name):
 logger = gen_logger('util')
 ```
 
+**logger.every_n**
+
+```py
+class ConditionalLogger:
+  def __init__(self, logger, should_log):
+    self.logger = logger
+    self.should_log = should_log
+
+  def __getattr__(self, name):
+    if self.should_log:
+      return getattr(self.logger, name)
+    else:
+      return lambda *args, **kwargs: None
+
+class CustomLogger(logging.Logger):
+	def __init__(self, name, level=logging.NOTSET):
+		super().__init__(name, level)
+		self.counter = {}
+
+		# should_log 只有两种取值，预先创建好所有 ConditionalLogger 对象
+		self.c_logger = {
+			False: ConditionalLogger(self, False),
+			True: ConditionalLogger(self, True),
+		}
+
+	def _find_caller(self):
+		frame = sys._getframe(2)  # 上上个调用者
+		while frame:
+			code = frame.f_code
+			return (code.co_filename, frame.f_lineno)
+			# if os.path.join("utils", "logger.") not in code.co_filename:
+			#   return code.co_filename, frame.f_lineno, code.co_name
+			frame = frame.f_back
+
+	def every_n(self, n, custom_key = None):
+		key = self._find_caller()
+		if custom_key is not None:
+			key = (key, custom_key)
+		if key not in self.counter:
+			self.counter[key] = 0
+		should_log = self.counter[key] % n == 0
+		self.counter[key] += 1
+		return self.c_logger[should_log]
+		# return ConditionalLogger(self, should_log)
+
+	def check(self, should_log):
+		return self.c_logger[should_log]
+
+logging.setLoggerClass(CustomLogger)
+logger = logging.getLogger(name)
+
+logger.every_n(10).info("xxx")
+logger.every_n(20, custom_key=f"{metric_name}").info("xxx")
+```
+
+
 **list 相加**
 
 - `a += b` 或 `a.extend(b)` 会在 a 的基础上拷贝 b，效率最高，但无法复用 a。
